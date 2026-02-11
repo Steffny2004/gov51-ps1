@@ -178,6 +178,7 @@ summary_stats_rendered
 ## 2.6 Does the max commute time make sense for a daily commute?
 The maximum reported commute time from our data is 195 minutes, and interestingly, all individuals who reported a 195 minute commute are from Wyoming. This seems like an absurdly long commute time, but when we look at the description of the `TRANTIME` variable, it states that this this variable is reporting the total amount of time, in minutes, that it usually took the respondent to get from home to work last week, so it might be that the reported 195 minutes is an aggregated commute time over 1 week rather than representing a daily commute.
 
+
 # 3 Who Should Be in Your Analysis?
 
 ## 3.1 Investigate the data
@@ -270,20 +271,42 @@ commuters_summary_rendered <- commuters_summary %>%
 commuters_summary_rendered
 ```
 
+
 # 4 Visualize and Interpret
 
 ## 4.1 Create a histogram of commute times
 ```{r}
-ggplot(commuters, aes(x = TRANTIME)) +
+commute_histogram <- ggplot(commuters, aes(x = TRANTIME)) +
   geom_histogram(binwidth = 10, fill = "lightblue", color = "skyblue") + 
   labs(title = "Commute Times for Commuter Subset of 2024 ACS Sample ", 
        x = "Commute Times (minutes)", 
        y = "Count") + 
   theme_minimal()
+
+commute_histogram
 ```
 
-# 4.2 Describe what you see
+## 4.2 Describe what you see
 From the histogram, it appears that the distribution of commute times is heavily right-skewed by a few, but extremely high, commute times that makes the histogram asymmetric However, the bulk of the data shows commuters traveling to work in under 50 minutes, with the center being around 20 minutes.
 
-# 4.3 Compare the mean and median commute time
-From the summary statistics table, the mean commute time was 27.2 minutes, which is higher than the median commute time that appears to be around 20 minutes. This agrees with our visual because the histogram is right-skewed by the more extreme commute times, which pulls the mean up as it is susceptible to these outliers.
+## 4.3 Compare the mean and median commute time
+From the summary statistics table, the mean commute time was 27.2 minutes, which is higher than the median commute time that appears to be around 20 minutes. This agrees with our visual because the histogram is right-skewed by the more extreme commute times, which pulls the mean up despite the majority of commute times not being nearly as high.
+
+## 4.4 Save your histogram
+```{r}
+ggsave(filename = "output/commute_histogram.png", plot = commute_histogram)
+```
+
+
+# 5 The Weight of Evidence
+
+## 5.1 Calculate the weighted mean
+```{r}
+weighted.mean(commuters$TRANTIME, commuters$PERWT)
+```
+
+## 5.2 Compare the means
+The weighted mean commute time, 27.19 minutes, is only 0.03 minutes less than the unweighted mean commute time of 27.22 minutes that we found earlier, making them very similar.
+
+## 5.3 What does each mean represent and why might they differ?
+The unweighted mean commute time represents the average commute time across individuals in the sample, with each individual having an equal weight. The weighted mean commute time, however, weights the individual observations in the sample by its person weight (`PERWT`) to adjust the mean commute time such that it represents the actual population that the sample was taken from, which in this case would be the U.S. population. The unweighted and weighted means might differ if the commuter sample was not an accurate representation of the U.S. population due to an over-sampling or under-sampling of certain groups.
