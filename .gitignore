@@ -3,6 +3,4 @@
 .RData
 .Ruserdata
 .DS_Store
-data/
-.DS_Store
-data/raw/
+data/raw/acs2024.csv
