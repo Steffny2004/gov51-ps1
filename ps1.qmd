@@ -1,5 +1,5 @@
 ---
-title: "ps1"
+title: "Gov51 - PSET1"
 author: "Steffny Meegoda"
 url: https://github.com/Steffny2004/gov51-ps1
 format: pdf
@@ -24,6 +24,29 @@ library(tidyverse)
 acs2024_raw <- read.csv("data/raw/acs2024.csv")
 ```
 
+## 2.2 What does each variable mean?
+From the IPUMS variable descriptions, the following variables mean:
+
+* `YEAR` - Reports the year when the household was included in the ACS.
+* `SAMPLE` - Unique 6-digit code that identifies the IPUMS sample. 
+  * First 4 digits are the year of the census/survey.
+  * Last 2 digits identify the sample within the year.
+* `SERIAL` - Unique 8-digit code assigned to each household record in a given sample.
+* `HHWT` - Indicates how many households in the U.S. population are represented by a given household in an IPUMS sample and has two implied decimals
+* `CLUSTER` - An 11-digit numeric variable designed for use with STRATA in Taylor series linear approximation for correction of complex sample design characteristics.
+* `STATEFIP` - Reports the state in which the household was located.
+* `GQ` - Classifies housing units as either households, group quarters, or vacant units.
+* `PERNUM` - Numbers all persons within each household consecutively in the order in which they appear on the original census or survey form.
+* `PERWT` - Indicates how many persons in the U.S. population are represented by a given person in an IPUMS sample and has two implied decimals.
+* `SEX` - Reports if the person was male or female.
+* `AGE` - Reports the person's age in years as of the last birthday.
+* `EDUC` - Indicates respondents' highest year of school or degree completed.
+* `EDUCD` - Same as `EDUC`, but with a more detailed coding scheme.
+* `EMPSTAT` - Indicates if respondent was employed, unemployed, or not in labor force.
+* `EMPSTATD` - Same as `EMPSTATD`, but with a more detailed coding scheme.
+* `INCTOT` - Reports respondent's total pre-tax personal income or losses from all sources for the previous year.
+* `TRANTIME` - Reports the total amount of time, in minutes, that it usually took the respondent to get from home to work last week.
+
 ```{r, include=FALSE}
 #Exploratory Analysis to answer Q2.3
 sum(is.na(acs2024_raw$EDUC))
@@ -44,20 +67,20 @@ acs2024_clean <- acs2024_raw %>%
   # Indicator female var from SEX
   mutate(female = if_else(SEX == 2, 1, 0)) %>%
   
-  # Indicator categorical vars from EDUC  
+  # Indicator dummy vars from EDUC  
   mutate(less_than_hs = ifelse(EDUC <= 5 | EDUC == 99, 1, 0)) %>%
   mutate(hs_only = ifelse(EDUC == 6, 1, 0)) %>%
   mutate(some_college = ifelse(EDUC >= 7 & EDUC <= 9 , 1, 0)) %>%
   mutate(college_only = ifelse(EDUC == 10, 1, 0)) %>%
   mutate(advanced_degree = ifelse(EDUC == 11, 1, 0)) %>%
   
-  # Indicator categorical vars from EDUC
+  # Indicator dummy vars from EDUC
   mutate(employed = ifelse(EMPSTAT == 1, 1, 0)) %>%
   mutate(unemployed = ifelse(EMPSTAT == 2, 1, 0)) %>%
   mutate(not_in_labor_force = ifelse(EMPSTAT == 3, 1, 0))
 ```
 
-## 2.4  Why does this matter?
+## 2.4  Why do special codes (0 or 99 for "N/A" or "Unknown") matter?
 If you treated "N/A" codes as real zeroes when calculating summary statistics, this would affect numeric calculations such as the mean and median. For instance, `TRANTIME` has no rows that contain "N/A" outright, which could falsely lead us to conclude that there are no such "N/A" values in our data. However, `TRANTIME` has coded "N/A"'s as 0, which if we ignored would result in serious consequences when trying to calculate summary statistics such as the mean, median, and percentiles. When we fail to exclude the "N/A" observations that are coded as 0, of which there are 2062945 observations, then the mean commute time is 10.81 minutes and the median is 0 minutes. These values are drastically lower than reality would reflect as a result of being "dragged down" by the many observations that contain 0, so when we do exclude the "N/A"'s, we see a more accurate and representative mean commute time of 27.2 minutes and a median of 20 minutes.
 
 ```{r, echo=FALSE}
@@ -70,8 +93,8 @@ mean_trantime_no_na <- mean(acs2024_clean$TRANTIME[acs2024_clean$TRANTIME != 0])
 median_trantime_no_na <- median(acs2024_clean$TRANTIME[acs2024_clean$TRANTIME != 0])
 
 # Print values
-cat("N/A's included for Commute Time:\n", "Mean:", mean_trantime, "\n Median:", median_trantime)
-cat("\n\nN/A's excluded for Commute Time:\n", "Mean:", mean_trantime_no_na, "\n Median:", median_trantime_no_na)
+#cat("N/A's included for Commute Time:\n", "Mean:", mean_trantime, "\n Median:", median_trantime)
+#cat("\nN/A's excluded for Commute Time:\n", "Mean:", mean_trantime_no_na, "\n Median:", median_trantime_no_na)
 ```
 
 ## 2.5 Create a summary statistics table
@@ -118,17 +141,17 @@ var_labels <- data.frame(
   ),
   Label = c(
     "Age",
-    "Female (1 = yes)",
-    "Less than high school",
-    "High school only",
-    "Some college",
-    "College only",
-    "Advanced degree",
+    "Female",
+    "Less than High School",
+    "High School Only",
+    "Some College",
+    "College Only",
+    "Advanced Degree",
     "Employed",
     "Unemployed",
-    "Not in labor force",
-    "Commute time (minutes)",
-    "Total income (pre-tax, $)"
+    "Not in Labor Force",
+    "Commute Time (minutes)",
+    "Total Income ($)"
   ),
   stringsAsFactors = FALSE
 )
@@ -139,17 +162,20 @@ summary_stats_labeled <- summary_stats %>%
   mutate(Variable = Label) %>%
   select(-Label)
 
-# Create formatted summary stats table
+# Create rendered summary stats table
 library(kableExtra)
 
-summary_stats_formatted <- summary_stats_labeled %>%
+summary_stats_rendered <- summary_stats_labeled %>%
   kable(
     format = "latex",
     booktabs = TRUE,
-    caption = "Table 1. Summary Statistics for 2024 ACS 2024 Sample",
+    caption = "Summary Statistics for 2024 ACS Sample",
     col.names = c("Variable", "N", "Mean", "Std Dev", "Min", "Max"),
     align = c("l", "r", "r", "r", "r", "r")) %>%
-  kable_styling(latex_options = c("hold_position", "striped"))
+  kable_styling(latex_options = c("hold_position"))
+
+# Display formatted table
+summary_stats_rendered
 ```
 
 ## 2.6 Does the max commute time make sense for a daily commute?
