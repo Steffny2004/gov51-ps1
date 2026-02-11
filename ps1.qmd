@@ -1,27 +1,156 @@
 ---
 title: "ps1"
+author: "Steffny Meegoda"
 url: https://github.com/Steffny2004/gov51-ps1
 format: pdf
 editor: visual
 ---
-
-## Quarto
-
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
-
-```{r}
-1 + 1
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(
+	echo = TRUE,
+	eval = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
 ```
 
-You can add options to executable code like this
+# 2 Get to Know Your Data
 
+## 2.1 Load ACS data
 ```{r}
-#| echo: false
-2 * 2
+#2.1 Load data
+library(tidyverse)
+acs2024_raw <- read.csv("data/raw/acs2024.csv")
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+```{r, include=FALSE}
+#Exploratory Analysis to answer Q2.3
+sum(is.na(acs2024_raw$EDUC))
+table(acs2024_raw$EDUC)
+
+sum(is.na(acs2024_raw$EMPSTAT))
+table(acs2024_raw$EMPSTAT)
+
+sum(is.na(acs2024_raw$TRANTIME))
+table(acs2024_raw$TRANTIME)
+```
+
+## 2.3 Create new variables
+```{r}
+#2.3 Create new variables
+acs2024_clean <- acs2024_raw %>% 
+  
+  # Indicator female var from SEX
+  mutate(female = if_else(SEX == 2, 1, 0)) %>%
+  
+  # Indicator categorical vars from EDUC  
+  mutate(less_than_hs = ifelse(EDUC <= 5 | EDUC == 99, 1, 0)) %>%
+  mutate(hs_only = ifelse(EDUC == 6, 1, 0)) %>%
+  mutate(some_college = ifelse(EDUC >= 7 & EDUC <= 9 , 1, 0)) %>%
+  mutate(college_only = ifelse(EDUC == 10, 1, 0)) %>%
+  mutate(advanced_degree = ifelse(EDUC == 11, 1, 0)) %>%
+  
+  # Indicator categorical vars from EDUC
+  mutate(employed = ifelse(EMPSTAT == 1, 1, 0)) %>%
+  mutate(unemployed = ifelse(EMPSTAT == 2, 1, 0)) %>%
+  mutate(not_in_labor_force = ifelse(EMPSTAT == 3, 1, 0))
+```
+
+## 2.4  Why does this matter?
+If you treated "N/A" codes as real zeroes when calculating summary statistics, this would affect numeric calculations such as the mean and median. For instance, `TRANTIME` has no rows that contain "N/A" outright, which could falsely lead us to conclude that there are no such "N/A" values in our data. However, `TRANTIME` has coded "N/A"'s as 0, which if we ignored would result in serious consequences when trying to calculate summary statistics such as the mean, median, and percentiles. When we fail to exclude the "N/A" observations that are coded as 0, of which there are 2062945 observations, then the mean commute time is 10.81 minutes and the median is 0 minutes. These values are drastically lower than reality would reflect as a result of being "dragged down" by the many observations that contain 0, so when we do exclude the "N/A"'s, we see a more accurate and representative mean commute time of 27.2 minutes and a median of 20 minutes.
+
+```{r, echo=FALSE}
+# N/A observations included
+mean_trantime <- mean(acs2024_clean$TRANTIME)
+median_trantime <- median(acs2024_clean$TRANTIME)
+
+# N/A observations excluded
+mean_trantime_no_na <- mean(acs2024_clean$TRANTIME[acs2024_clean$TRANTIME != 0])
+median_trantime_no_na <- median(acs2024_clean$TRANTIME[acs2024_clean$TRANTIME != 0])
+
+# Print values
+cat("N/A's included for Commute Time:\n", "Mean:", mean_trantime, "\n Median:", median_trantime)
+cat("\n\nN/A's excluded for Commute Time:\n", "Mean:", mean_trantime_no_na, "\n Median:", median_trantime_no_na)
+```
+
+## 2.5 Create a summary statistics table
+```{r}
+# Create Summary Stats
+summary_stats <- acs2024_clean %>%
+  
+  # Select cols for summary stats
+  select(AGE, 
+         female, 
+         less_than_hs, hs_only, some_college, college_only, advanced_degree, 
+         employed, unemployed, not_in_labor_force, 
+         TRANTIME, 
+         INCTOT) %>%
+  
+  # Exclude "N/A" coded observations
+  mutate(
+    TRANTIME = na_if(TRANTIME, 0), 
+    INCTOT = na_if(INCTOT, 9999999)) %>%
+  
+  # Calculate summary stats
+  pivot_longer(everything(), names_to = "Variable", values_to = "Value") %>%
+  group_by(Variable) %>%
+  summarize(
+    N = sum(!is.na(Value)),
+    Mean = mean(Value, na.rm = TRUE),
+    `Std Dev` = sd(Value, na.rm = TRUE),
+    Min = min(Value, na.rm = TRUE),
+    Max = max(Value, na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+
+
+```{r}
+# Create Rendered Summary Stats
+# Make var labels for rendered table
+var_labels <- data.frame(
+  Variable = c(
+    "AGE","female","less_than_hs","hs_only","some_college",
+    "college_only","advanced_degree",
+    "employed","unemployed","not_in_labor_force",
+    "TRANTIME","INCTOT"
+  ),
+  Label = c(
+    "Age",
+    "Female (1 = yes)",
+    "Less than high school",
+    "High school only",
+    "Some college",
+    "College only",
+    "Advanced degree",
+    "Employed",
+    "Unemployed",
+    "Not in labor force",
+    "Commute time (minutes)",
+    "Total income (pre-tax, $)"
+  ),
+  stringsAsFactors = FALSE
+)
+
+# Use new labels for summary stat vars
+summary_stats_labeled <- summary_stats %>%
+  left_join(var_labels, by = "Variable") %>%
+  mutate(Variable = Label) %>%
+  select(-Label)
+
+# Create formatted summary stats table
+library(kableExtra)
+
+summary_stats_formatted <- summary_stats_labeled %>%
+  kable(
+    format = "latex",
+    booktabs = TRUE,
+    caption = "Table 1. Summary Statistics for 2024 ACS 2024 Sample",
+    col.names = c("Variable", "N", "Mean", "Std Dev", "Min", "Max"),
+    align = c("l", "r", "r", "r", "r", "r")) %>%
+  kable_styling(latex_options = c("hold_position", "striped"))
+```
+
+## 2.6 Does the max commute time make sense for a daily commute?
+The maximum reported commute time from our data is 195 minutes, and interestingly, all individuals who reported a 195 minute commute are from Wyoming. This seems like an absurdly long commute time, but when we look at the description of the `TRANTIME` variable, it states that this this variable is reporting the total amount of time, in minutes, that it usually took the respondent to get from home to work last week, so it might be that the reported 195 minutes is an aggregated commute time over 1 week rather than representing a daily commute.
