@@ -16,6 +16,11 @@ knitr::opts_chunk$set(
 )
 ```
 
+# 1 Project Setup
+
+Initial project setup was completed, and appropriate documents and folder should be on Github (with the exception of `data/` containing the actual acs2024.csv file on account of it being too big).
+
+
 # 2 Get to Know Your Data
 
 ## 2.1 Load ACS data
