@@ -269,3 +269,21 @@ commuters_summary_rendered <- commuters_summary %>%
 # Display rendered table
 commuters_summary_rendered
 ```
+
+# 4 Visualize and Interpret
+
+## 4.1 Create a histogram of commute times
+```{r}
+ggplot(commuters, aes(x = TRANTIME)) +
+  geom_histogram(binwidth = 10, fill = "lightblue", color = "skyblue") + 
+  labs(title = "Commute Times for Commuter Subset of 2024 ACS Sample ", 
+       x = "Commute Times (minutes)", 
+       y = "Count") + 
+  theme_minimal()
+```
+
+# 4.2 Describe what you see
+From the histogram, it appears that the distribution of commute times is heavily right-skewed by a few, but extremely high, commute times that makes the histogram asymmetric However, the bulk of the data shows commuters traveling to work in under 50 minutes, with the center being around 20 minutes.
+
+# 4.3 Compare the mean and median commute time
+From the summary statistics table, the mean commute time was 27.2 minutes, which is higher than the median commute time that appears to be around 20 minutes. This agrees with our visual because the histogram is right-skewed by the more extreme commute times, which pulls the mean up as it is susceptible to these outliers.
