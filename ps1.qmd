@@ -310,7 +310,7 @@ commuters_summary_rendered <- commuters_summary %>%
   # Style table
   kable(
     booktabs = TRUE,
-    caption = "Summary Statistics for Commuter Subset of 2024 ACS Sample",
+    caption = "Summary Statistics for 2024 ACS Sample",
     col.names = c("Variable", "N", "Mean", "Std Dev", "Min", "Max"),
     align = c("l", "r", "r", "r", "r", "r")) %>%
   kable_styling(latex_options = "hold_position")
