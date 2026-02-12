@@ -13,7 +13,9 @@ knitr::opts_chunk$set(
 	echo = TRUE,
 	eval = TRUE,
 	message = FALSE,
-	warning = FALSE
+	warning = FALSE, 
+  library(tidyverse),
+  library(kableExtra)
 )
 ```
 
@@ -25,8 +27,6 @@ Initial project setup was completed, and appropriate documents and folder are on
 
 ## 2.1 Load ACS data
 ```{r}
-# Load data
-library(tidyverse)
 acs2024_raw <- read.csv("data/raw/acs2024.csv")
 ```
 
@@ -79,110 +79,110 @@ acs2024_clean <- acs2024_raw %>%
   mutate(college_only = ifelse(EDUC == 10, 1, 0)) %>%
   mutate(advanced_degree = ifelse(EDUC == 11, 1, 0)) %>%
   
-  # Indicator dummy vars from EDUC
+  # Indicator dummy vars from EMPSTAT
   mutate(employed = ifelse(EMPSTAT == 1, 1, 0)) %>%
   mutate(unemployed = ifelse(EMPSTAT == 2, 1, 0)) %>%
   mutate(not_in_labor_force = ifelse(EMPSTAT == 3, 1, 0))
 
-# List of dummy indicator vars
-dummy_vars <- c("female", "less_than_hs", "hs_only", 
-                "some_college", "college_only", "advanced_degree",
-                "employed", "unemployed", "not_in_labor_force")
+# Confirm new variables are in dataset
+colnames(acs2024_clean)[19:27]
 ```
 
 ## 2.4  Why do special codes (0 or 99 for "N/A" or "Unknown") matter?
-If you treated "N/A" codes as real zeroes when calculating summary statistics, this would affect numeric calculations such as the mean and median. For instance, `TRANTIME` has no rows that contain "N/A" outright, which could falsely lead us to conclude that there are no such "N/A" values in our data. However, `TRANTIME` has coded "N/A"'s as 0, so when we fail to exclude the "N/A" observations that are coded as 0, of which there are 2062945 observations, then the mean commute time is 10.81 minutes and the median is 0 minutes. These values are drastically lower than when we do exclude the "N/A"'s, which then gives us a mean commute time of 27.2 minutes and a median of 20 minutes.
-
 ```{r, include=FALSE}
 # N/A observations included
-mean_trantime <- mean(acs2024_clean$TRANTIME)
-median_trantime <- median(acs2024_clean$TRANTIME)
+mean_trantime_w_na <- round(mean(acs2024_clean$TRANTIME), 2)
+median_trantime_w_na <- round(median(acs2024_clean$TRANTIME), 2)
 
 # N/A observations excluded
-mean_trantime_no_na <- mean(acs2024_clean$TRANTIME[acs2024_clean$TRANTIME != 0])
-median_trantime_no_na <- median(acs2024_clean$TRANTIME[acs2024_clean$TRANTIME != 0])
+mean_trantime_no_na <- round(mean(acs2024_clean$TRANTIME[acs2024_clean$TRANTIME != 0]), 2)
+median_trantime_no_na <- round(median(acs2024_clean$TRANTIME[acs2024_clean$TRANTIME != 0]), 2)
 
-# Display values
+# Print values
 cat("N/A's included for Commute Time:\n", 
-    "Mean:", mean_trantime, "\n ", 
-    "Median:", median_trantime)
+    "Mean:", mean_trantime_w_na, "\n ", 
+    "Median:", median_trantime_w_na)
 cat("\nN/A's excluded for Commute Time:\n", 
     "Mean:", mean_trantime_no_na, "\n ",
     "Median:", median_trantime_no_na)
 ```
+If you treated "N/A" codes as real zeroes when calculating summary statistics, this would affect numeric calculations such as the mean and median. For instance, `TRANTIME` has no rows that contain "N/A" outright, which could falsely lead us to conclude that there are no such "N/A" values in our data. However, `TRANTIME` has coded "N/A"'s as 0, so when we fail to exclude these observations, then the mean commute time is `r mean_trantime_w_na` minutes and the median is `r median_trantime_w_na` minutes. These values are drastically lower than when we do exclude the "N/A"'s, which then gives us a mean commute time of `r mean_trantime_no_na` minutes and a median of `r median_trantime_no_na` minutes.
 
 ## 2.5 Create a summary statistics table
 ```{r}
-# Create summary stats
+# Create summary stats table
 summary_stats <- acs2024_clean %>%
   
-  # Select cols for summary stats
+  # Select vars for summary stats
   select(AGE, female, 
          less_than_hs, hs_only, some_college, college_only, advanced_degree, 
          employed, unemployed, not_in_labor_force, 
          TRANTIME, INCTOT) %>%
   
-  # Exclude "N/A" coded observations
+  # Exclude "N/A" observations from summary stats calculations
   mutate(
     TRANTIME = na_if(TRANTIME, 0), 
     INCTOT = na_if(INCTOT, 9999999)) %>%
   
+  # Reshape table
+  pivot_longer(
+    cols = everything(),
+    names_to = "variable",
+    values_to = "value") %>%
+  
   # Calculate summary stats
-  pivot_longer(everything(), names_to = "variable", values_to = "value") %>%
   group_by(variable) %>%
   summarize(
-    n = sum(!is.na(value)), 
-    mean = round(mean(value, na.rm = TRUE), 2), 
+    n = sum(!is.na(value)),
+    mean = round(mean(value, na.rm = TRUE), 2),
     sd = round(sd(value, na.rm = TRUE), 2),
     min = min(value, na.rm = TRUE),
     max = max(value, na.rm = TRUE),
     .groups = "drop")
 
-# Make var labels for rendered table
-var_labels <- data.frame(
-  variable = c(
-    "AGE",
-    "female",
-    "less_than_hs",
-    "hs_only",
-    "some_college", 
-    "college_only",
-    "advanced_degree",
-    "employed",
-    "unemployed",
-    "not_in_labor_force",
-    "TRANTIME",
-    "INCTOT"),
-  label = c(
-    "Age", 
-    "Female",
-    "Less than High School", 
-    "High School Only", 
-    "Some College",
-    "College Only",
-    "Advanced Degree", 
-    "Employed", 
-    "Unemployed",
-    "Not in Labor Force",
-    "Commute Time (minutes)", 
-    "Total Income ($)"),
-  stringsAsFactors = FALSE
-  )
-
-# Create rendered summary stats
-library(kableExtra)
-
+# Create rendered table
 summary_stats_rendered <- summary_stats %>%
-  left_join(var_labels, by = "variable") %>%
-  mutate(variable = label) %>%
-  select(-label) %>%
+  
+  # Rename variables
+  mutate(
+    variable = recode(variable,
+      AGE = "Age",
+      female = "Female",
+      less_than_hs = "Less than High School",
+      hs_only = "High School Only",
+      some_college = "Some College",
+      college_only = "College Only",
+      advanced_degree = "Advanced Degree",
+      employed = "Employed",
+      unemployed = "Unemployed",
+      not_in_labor_force = "Not in Labor Force",
+      TRANTIME = "Commute Time (mins)",
+      INCTOT = "Total Income ($)"),
+    
+    # Order variables
+    variable = factor(variable, levels = c(
+      "Age",
+      "Female",
+      "Less than High School",
+      "High School Only",
+      "Some College",
+      "College Only",
+      "Advanced Degree",
+      "Employed",
+      "Unemployed",
+      "Not in Labor Force",
+      "Commute Time (mins)",
+      "Total Income ($)"))) %>%
+  arrange(variable) %>%
+  
+  # Style table
   kable(
     booktabs = TRUE,
     caption = "Summary Statistics for 2024 ACS Sample",
     col.names = c("Variable", "N", "Mean", "Std Dev", "Min", "Max"),
     align = c("l", "r", "r", "r", "r", "r")) %>%
   kable_styling(latex_options = "hold_position")
-
+      
 # Display rendered table
 summary_stats_rendered
 ```
@@ -218,8 +218,10 @@ non_commuters_empstat
 
 # Non-commuter age 
 ggplot(non_commuters, aes(x = AGE)) +
-  geom_histogram(fill = "lightblue", color = "skyblue") + 
-  labs(title = "Age Distribution of Non-Commuters", x = "Age", y = "Count") + 
+  geom_histogram(bins = 25, fill = "lightblue", color = "skyblue") + 
+  labs(title = "Age Distribution of Non-Commuters", 
+       x = "Age", 
+       y = "Number of Non-Commuters") + 
   theme_minimal()
 ```
 From this simple analysis on the sample of people that had an "N/A" commute time who we will dub "non-commuters", we see that the majority of these individuals (58%) are not in the labor force, and the bulk distribution of these individuals are on either end of the age spectrum, namely children under 18 years old and adults over 65 years old.
@@ -240,20 +242,27 @@ Now, our analytical sample has `r commuter_count` people and a minimum commute t
 
 ## 3.4 Create a new summary statistics table
 ```{r}
-# Create summary stats
+# Create summary stats table
 commuters_summary <- commuters %>%
   
-  # Select cols for summary stats
+  # Select vars for summary stats
   select(AGE, female, 
-         less_than_hs, hs_only, some_college, college_only, advanced_degree,
+         less_than_hs, hs_only, some_college, college_only, advanced_degree, 
          employed, unemployed, not_in_labor_force, 
          TRANTIME, INCTOT) %>%
   
-  # Exclude "N/A" coded observations
-  mutate(INCTOT = na_if(INCTOT, 9999999)) %>%
+  # Exclude "N/A" observations from summary stats calculations
+  mutate(
+    TRANTIME = na_if(TRANTIME, 0), 
+    INCTOT = na_if(INCTOT, 9999999)) %>%
+  
+  # Reshape table
+  pivot_longer(
+    cols = everything(),
+    names_to = "variable",
+    values_to = "value") %>%
   
   # Calculate summary stats
-  pivot_longer(everything(), names_to = "variable", values_to = "value") %>%
   group_by(variable) %>%
   summarize(
     n = sum(!is.na(value)),
@@ -263,18 +272,49 @@ commuters_summary <- commuters %>%
     max = max(value, na.rm = TRUE),
     .groups = "drop")
 
-# Create rendered summary stats
+# Create rendered table
 commuters_summary_rendered <- commuters_summary %>%
-  left_join(var_labels, by = "variable") %>%
-  mutate(variable = label) %>%
-  select(-label) %>%
+  
+  # Rename variables
+  mutate(
+    variable = recode(variable,
+      AGE = "Age",
+      female = "Female",
+      less_than_hs = "Less than High School",
+      hs_only = "High School Only",
+      some_college = "Some College",
+      college_only = "College Only",
+      advanced_degree = "Advanced Degree",
+      employed = "Employed",
+      unemployed = "Unemployed",
+      not_in_labor_force = "Not in Labor Force",
+      TRANTIME = "Commute Time (mins)",
+      INCTOT = "Total Income ($)"),
+    
+    # Order variables
+    variable = factor(variable, levels = c(
+      "Age",
+      "Female",
+      "Less than High School",
+      "High School Only",
+      "Some College",
+      "College Only",
+      "Advanced Degree",
+      "Employed",
+      "Unemployed",
+      "Not in Labor Force",
+      "Commute Time (mins)",
+      "Total Income ($)"))) %>%
+  arrange(variable) %>%
+  
+  # Style table
   kable(
     booktabs = TRUE,
     caption = "Summary Statistics for Commuter Subset of 2024 ACS Sample",
     col.names = c("Variable", "N", "Mean", "Std Dev", "Min", "Max"),
     align = c("l", "r", "r", "r", "r", "r")) %>%
   kable_styling(latex_options = "hold_position")
-
+      
 # Display rendered table
 commuters_summary_rendered
 ```
@@ -284,10 +324,20 @@ commuters_summary_rendered
 
 ## 4.1 Create a histogram of commute times
 ```{r}
+median_commute <- median(commuters$TRANTIME)
+
 commute_histogram <- ggplot(commuters, aes(x = TRANTIME)) +
-  geom_histogram(binwidth = 10, fill = "lightblue", color = "skyblue") + 
-  labs(title = "Commute Times for Commuter Subset of 2024 ACS Sample ", 
-       x = "Commute Times (minutes)", y = "Count") + 
+  geom_histogram(bins = 20, fill = "lightblue", color = "skyblue") +
+  geom_vline(xintercept = median_commute, 
+             color = "blue", linetype = "dashed", size = 1) +
+  annotate("text", x = median_commute + 20, y = 420000, 
+           label = paste("Median =", round(median_commute)), 
+           color = "blue", size = 3.5) +
+  labs(title = "Distribution of Commute Time for Workers",
+       caption = "Source: 2024 ACS 1-Year Sample",
+       x = "Commute Time (minutes)",
+       y = "Number of Workers"
+       ) +
   theme_minimal()
 commute_histogram
 ```
@@ -296,7 +346,7 @@ commute_histogram
 From the histogram, it appears that the distribution of commute times is heavily right-skewed by a few, but extremely high, commute times that makes the histogram asymmetric. However, the bulk of the data shows commuters traveling to work in under 50 minutes, with the center being around 20 minutes.
 
 ## 4.3 Compare the mean and median commute time
-From the summary statistics table, the mean commute time was 27.2 minutes, which is higher than the median commute time that appears to be around 20 minutes. This agrees with our visual because the histogram is right-skewed by the more extreme commute times, which pulls the mean up despite the majority of commute times not being nearly as high.
+From the summary statistics table, the mean commute time was 27.22 minutes, which is higher than the median commute time of 20 minutes by 7.22 minutes. This agrees with our visual because the histogram is right-skewed by the more extreme commute times, which pulls the mean up to a higher value despite the majority of commute times not being nearly as high, making our median more robust to outliers and possibly more representative of the data.
 
 ## 4.4 Save your histogram
 ```{r}
