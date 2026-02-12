@@ -1,5 +1,5 @@
 ---
-title: "GOV51 - PSET1"
+title: "GOV51 PSET1"
 subtitle: "\\Large Steffny Meegoda"
 author: "https://github.com/Steffny2004/gov51-ps1"
 format: pdf
